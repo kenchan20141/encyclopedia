@@ -526,63 +526,75 @@
             return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
         }
 
-        function initSpeechRecognition() {
-            if (!isSpeechRecognitionSupported()) {
-                voiceBtn.disabled = true;
-                voiceBtn.title = '您的瀏覽器不支援語音輸入';
-                return null;
-            }
+       function initSpeechRecognition() {
+    if (!isSpeechRecognitionSupported()) {
+        voiceBtn.disabled = true;
+        voiceBtn.title = '您的瀏覽器不支援語音輸入';
+        return null;
+    }
 
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'zh-HK';
-            recognition.continuous = true; // 改為連續識別
-            recognition.interimResults = true; // 顯示中間結果
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-HK';
+    recognition.continuous = true; // 連續識別
+    recognition.interimResults = true; // 顯示中間結果
 
-            recognition.onstart = function() {
-                console.log('Speech recognition started');
-                isRecording = true;
-                voiceBtn.classList.add('recording');
-                recordingIndicator.style.display = 'flex';
-                swipeHint.style.display = 'block';
-                voiceBtn.title = '正在語音輸入，滑動取消';
-            };
+    let lastUpdateTime = Date.now(); // 記錄最後更新時間
+    const PAUSE_THRESHOLD = 1000; // 1秒停頓閾值
 
-            recognition.onresult = function(event) {
-                let transcript = '';
-                for (let i = 0; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
-                }
-                transcript = transcript
-                    .replace(/(呢|呀|啦|喎|咁|同埋)$/g, '$1。')
-                    .replace(/(係|唔係|有|無|咪|係咪)$/g, '$1，')
-                    .replace(/(因為|所以|如果|但係)$/g, '$1，')
-                    .replace(/([。！？])([^\s])/g, '$1 $2')
-                    .trim();
-                userInput.value = transcript;
+    recognition.onstart = function() {
+        console.log('Speech recognition started');
+        isRecording = true;
+        voiceBtn.classList.add('recording');
+        recordingIndicator.style.display = 'flex';
+        swipeHint.style.display = 'block';
+        voiceBtn.title = '正在語音輸入，滑動取消';
+    };
 
-                // 清除之前的定時器並設置新的兩秒定時器
-                clearTimeout(autoSendTimeout);
-                autoSendTimeout = setTimeout(() => {
-                    if (userInput.value.trim()) {
-                        sendMessage();
-                        recognition.stop();
-                    }
-                }, 2000);
-            };
-
-            recognition.onerror = function(event) {
-                console.error('語音識別錯誤:', event.error);
-                addMessage(`語音輸入出錯: ${event.error}`, 'error');
-                stopRecording();
-            };
-
-            recognition.onend = function() {
-                stopRecording();
-            };
-
-            return recognition;
+    recognition.onresult = function(event) {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
         }
+        // 改進正則表達式，加入更多標點規則
+        transcript = transcript
+            .replace(/(呢|呀|啦|喎|咁|同埋|係|唔係|有|無|咪|係咪|因為|所以|如果|但係)$/g, '$1，')
+            .replace(/(咩|點解|邊個|幾時|點樣)$/g, '$1？')
+            .replace(/(哇|哎呀|好正|好嘢)$/g, '$1！')
+            .replace(/([。！？])([^\s])/g, '$1 $2')
+            .trim();
+
+        // 檢查停頓時間，自動加句號
+        const currentTime = Date.now();
+        if (currentTime - lastUpdateTime > PAUSE_THRESHOLD && !transcript.match(/[。！？]$/)) {
+            transcript += '。';
+        }
+        lastUpdateTime = currentTime;
+
+        userInput.value = transcript;
+
+        // 清除之前嘅定時器並設置新嘅兩秒定時器
+        clearTimeout(autoSendTimeout);
+        autoSendTimeout = setTimeout(() => {
+            if (userInput.value.trim()) {
+                sendMessage();
+                recognition.stop();
+            }
+        }, 2000);
+    };
+
+    recognition.onerror = function(event) {
+        console.error('語音識別錯誤:', event.error);
+        addMessage(`語音輸入出錯: ${event.error}`, 'error');
+        stopRecording();
+    };
+
+    recognition.onend = function() {
+        stopRecording();
+    };
+
+    return recognition;
+}
 
         let recognition = initSpeechRecognition();
 
