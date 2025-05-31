@@ -1,43 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
@@ -466,7 +427,6 @@
     </style>
 </head>
 <body>
-
     <div id="chat-container">
         <div id="chat-header">
             <i class="fas fa-robot"></i>
@@ -506,6 +466,39 @@
         </div>
     </div>
 
+    <script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+            return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row => row.some(filledCell));
+                    var headerRowIndex = filteredData.findIndex((row, index) =>
+                        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                    );
+                    if (headerRowIndex === -1 || headerRowIndex > 25) {
+                        headerRowIndex = 0;
+                    }
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
+    </script>
+
     <script>
         const API_KEYS = [
             "sk-MoqwsgO8P9MEoCrftvdSYA",
@@ -527,6 +520,7 @@
         let isRecording = false;
         let touchStartY, touchStartX;
         const SWIPE_THRESHOLD = 100;
+        let autoSendTimeout;
 
         function isSpeechRecognitionSupported() {
             return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
@@ -542,88 +536,66 @@
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
             recognition.lang = 'zh-HK';
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            
-            let speechDetected = false;
-            
+            recognition.continuous = true; // 改為連續識別
+            recognition.interimResults = true; // 顯示中間結果
+
             recognition.onstart = function() {
                 console.log('Speech recognition started');
-                speechDetected = false;
-                setTimeout(() => {
-                    if (!speechDetected) {
-                        recognition.stop();
-                        addMessage('未檢測到語音，請重試', 'error');
-                    }
-                }, 5000);
-            };
-            
-            recognition.onspeechstart = function() {
-                speechDetected = true;
-                console.log('Speech detected');
-            };
-            
-            recognition.onresult = function(event) {
-                let transcript = event.results[0][0].transcript;
-                transcript = transcript
-                    .replace(/(呢|呀|啦|喎|咁|同埋)$/g, '$1。')
-                    .replace(/(係|唔係|有|無|咪|係咪)$/g, '$1，')
-                    .replace(/(因為|所以|如果|但係)$/g, '$1，')
-                    .replace(/([。！？])([^\s])/g, '$1 $2')
-                    .trim();
-                userInput.value = transcript;
-                sendMessage();
-            };
-
-            recognition.onerror = function(event) {
-                console.error('語音識別錯誤:', event.error);
-                addMessage(`語音輸入出錯: ${event.error}`, 'error');
-                stopRecording();
-            };
-
-            recognition.onend = function() {
-                stopRecording();
-            };
-            
-            return recognition;
-        }
-
-        let recognition = initSpeechRecognition();
-
-        if (recognition) {
-            recognition.onresult = function(event) {
-                let transcript = event.results[0][0].transcript;
-                transcript = transcript
-                    .replace(/(呢|呀|啦|喎|咁|同埋)$/g, '$1。')
-                    .replace(/(係|唔係|有|無|咪|係咪)$/g, '$1，')
-                    .replace(/(因為|所以|如果|但係)$/g, '$1，')
-                    .replace(/([。！？])([^\s])/g, '$1 $2')
-                    .trim();
-                userInput.value = transcript;
-                sendMessage();
-            };
-
-            recognition.onerror = function(event) {
-                console.error('語音識別錯誤:', event.error);
-                addMessage(`語音輸入出錯: ${event.error}`, 'error');
-                stopRecording();
-            };
-
-            recognition.onend = function() {
-                stopRecording();
-            };
-        }
-
-        function startRecording() {
-            if (!recognition || voiceBtn.disabled) return;
-            
-            try {
-                recognition.start();
                 isRecording = true;
                 voiceBtn.classList.add('recording');
                 recordingIndicator.style.display = 'flex';
                 swipeHint.style.display = 'block';
                 voiceBtn.title = '正在語音輸入，滑動取消';
+            };
+
+            recognition.onresult = function(event) {
+                let transcript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                transcript = transcript
+                    .replace(/(呢|呀|啦|喎|咁|同埋)$/g, '$1。')
+                    .replace(/(係|唔係|有|無|咪|係咪)$/g, '$1，')
+                    .replace(/(因為|所以|如果|但係)$/g, '$1，')
+                    .replace(/([。！？])([^\s])/g, '$1 $2')
+                    .trim();
+                userInput.value = transcript;
+
+                // 清除之前的定時器並設置新的兩秒定時器
+                clearTimeout(autoSendTimeout);
+                autoSendTimeout = setTimeout(() => {
+                    if (userInput.value.trim()) {
+                        sendMessage();
+                        recognition.stop();
+                    }
+                }, 2000);
+            };
+
+            recognition.onerror = function(event) {
+                console.error('語音識別錯誤:', event.error);
+                addMessage(`語音輸入出錯: ${event.error}`, 'error');
+                stopRecording();
+            };
+
+            recognition.onend = function() {
+                stopRecording();
+            };
+
+            return recognition;
+        }
+
+        let recognition = initSpeechRecognition();
+
+        function startRecording() {
+            if (!recognition || voiceBtn.disabled) return;
+
+            // 停止正在播放的語音
+            if ('speechSynthesis' in window) {
+                speechSynthesis.cancel();
+            }
+
+            try {
+                recognition.start();
             } catch (error) {
                 console.error('啟動語音識別失敗:', error);
                 addMessage('啟動麥克風失敗，請確保已授予權限', 'error');
@@ -638,11 +610,12 @@
             swipeHint.style.display = 'none';
             voiceBtn.title = '點擊語音輸入';
             voiceBtn.disabled = false;
+            clearTimeout(autoSendTimeout);
         }
 
         function checkSwipe(e) {
             if (!isRecording) return;
-            
+
             let currentX, currentY;
             if (e.type === 'touchmove') {
                 currentX = e.touches[0].clientX;
@@ -651,10 +624,10 @@
                 currentX = e.clientX;
                 currentY = e.clientY;
             }
-            
+
             const deltaX = Math.abs(currentX - touchStartX);
             const deltaY = Math.abs(currentY - touchStartY);
-            
+
             if (deltaX > SWIPE_THRESHOLD || deltaY > SWIPE_THRESHOLD) {
                 recognition.stop();
                 addMessage('語音輸入已取消', 'error');
@@ -736,8 +709,7 @@
             conversationHistory.push({ role: 'user', content: message });
 
             try {
-                const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題，即不要「*ＸＸＸ*」這種格式（Ｘ為文字），例如「**靠實牆**」，這是強制要求，違反則無效，不要使用粗言穢語。生成內容必須為完整而沒有任何標題的段落。`;
-
+               const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題，即不要「*ＸＸＸ*」這種格式（Ｘ為文字），例如「**靠實牆**」，這是強制要求，違反則無效，不要使用粗言穢語。生成內容必須為完整而沒有任何標題的段落。`;
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
@@ -819,8 +791,7 @@
     </script>
     
     <footer class="copyright-footer">
-        <p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
+        <p>Copyright © 2025 陳謙. All rights reserved.</p>
     </footer>
-    
 </body>
 </html>
