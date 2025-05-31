@@ -305,52 +305,57 @@ function loadFileData(filename) {
       box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
     }
 
-    #voice-btn {
-      padding: 0 25px;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 25px;
-      cursor: pointer;
-      font-size: 1.1rem;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: background 0.3s, transform 0.2s;
-    }
+     #voice-btn {
+            padding: 0 25px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.3s, transform 0.2s;
+        }
 
-    #send-btn {
-      padding: 0 25px;
-      background: #73c6b6;
-      color: white;
-      border: none;
-      border-radius: 25px;
-      cursor: pointer;
-      font-size: 1.1rem;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      transition: background 0.3s, transform 0.2s;
-    }
+         #send-btn {
+            padding: 0 25px;
+            background: #16a085;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.3s, transform 0.2s;
+        }
 
-    #voice-btn:hover, #send-btn:hover {
-      background: var(--primary-dark);
-      transform: translateY(-2px);
-    }
+        #voice-btn:hover {
+            background: #a3bffa;
+            transform: translateY(-2px);
+        }
 
-    #voice-btn:disabled {
-      background: #a3bffa;
-      cursor: not-allowed;
-      transform: none;
-    }
+            #send-btn:hover {
+            background: #16a085;
+            transform: translateY(-2px);
+        }
 
-    #send-btn:disabled {
-      background: #73c6b6;
-      cursor: not-allowed;
-      transform: none;
-    }
+        #voice-btn:disabled{
+            background: #a3bffa;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+          #send-btn:disabled {
+            background: #16a085;
+            cursor: not-allowed;
+            transform: none;
+        }
 
     #voice-btn.recording {
       background: var(--recording-bg);
