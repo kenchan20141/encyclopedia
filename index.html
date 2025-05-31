@@ -340,8 +340,14 @@ function loadFileData(filename) {
       transform: translateY(-2px);
     }
 
-    #voice-btn:disabled, #send-btn:disabled {
+    #voice-btn:disabled {
       background: #a3bffa;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #send-btn:disabled {
+      background: #73c6b6;
       cursor: not-allowed;
       transform: none;
     }
