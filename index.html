@@ -1,5 +1,43 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
 
-<!DOCTYPE html>
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
@@ -23,6 +61,10 @@
       --shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
       --radius: 20px;
       --radius-sm: 12px;
+    }
+
+    html {
+      font-size: 24px;
     }
 
     * {
@@ -70,12 +112,12 @@
 
     .copyright-footer p {
       margin: 0;
-      font-size: 14px;
+      font-size: 0.8rem;
     }
 
     @media (max-width: 600px) {
       .copyright-footer p {
-        font-size: 12px;
+        font-size: 0.7rem;
       }
     }
 
@@ -123,7 +165,7 @@
 
     .message {
       max-width: 80%;
-      padding: 18px 24px;
+      padding: 24px 30px;
       border-radius: var(--radius-sm);
       position: relative;
       box-shadow: var(--shadow);
@@ -170,7 +212,7 @@
     }
 
     .message-content {
-      line-height: 1.7;
+      line-height: 1.8;
       font-size: 1.05rem;
     }
 
@@ -218,14 +260,15 @@
       background: rgba(255, 255, 255, 0.8);
       border: none;
       border-radius: 50%;
-      width: 34px;
-      height: 34px;
+      width: 2rem;
+      height: 2rem;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       color: var(--text-light);
       transition: all 0.3s;
+      font-size: 1.2rem;
     }
 
     .copy-btn:hover {
@@ -244,7 +287,7 @@
 
     #input-container {
       display: flex;
-      padding: 25px;
+      padding: 30px;
       background: white;
       border-top: 1px solid #edf2f7;
       gap: 15px;
@@ -254,7 +297,7 @@
 
     #user-input {
       flex: 1;
-      padding: 18px 25px;
+      padding: 20px 30px;
       border: 2px solid #e2e8f0;
       border-radius: 25px;
       font-size: 1.1rem;
@@ -267,57 +310,57 @@
       box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
     }
 
-     #voice-btn {
-            padding: 0 25px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: background 0.3s, transform 0.2s;
-        }
+    #voice-btn {
+      padding: 0 30px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.3s, transform 0.2s;
+    }
 
-         #send-btn {
-            padding: 0 25px;
-            background: #45b39d ;
-            color: white;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 1.1rem;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: background 0.3s, transform 0.2s;
-        }
+    #send-btn {
+      padding: 0 30px;
+      background: #45b39d;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.3s, transform 0.2s;
+    }
 
-        #voice-btn:hover {
-            background: #a3bffa;
-            transform: translateY(-2px);
-        }
+    #voice-btn:hover {
+      background: #a3bffa;
+      transform: translateY(-2px);
+    }
 
-            #send-btn:hover {
-            background: #45b39d ;
-            transform: translateY(-2px);
-        }
+    #send-btn:hover {
+      background: #45b39d;
+      transform: translateY(-2px);
+    }
 
-        #voice-btn:disabled{
-            background: #a3bffa;
-            cursor: not-allowed;
-            transform: none;
-        }
+    #voice-btn:disabled {
+      background: #a3bffa;
+      cursor: not-allowed;
+      transform: none;
+    }
 
-          #send-btn:disabled {
-            background: #45b39d ;
-            cursor: not-allowed;
-            transform: none;
-        }
+    #send-btn:disabled {
+      background: #45b39d;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     #voice-btn.recording {
       background: var(--recording-bg);
@@ -494,11 +537,11 @@
       <input type="text" id="user-input" placeholder="輸入你的問題，或者用語音輸入..." />
       <button id="voice-btn" title="點擊語音輸入">
         <i class="fas fa-microphone"></i>
-        <span>語音輸入</span>
+
       </button>
       <button id="send-btn">
         <i class="fas fa-paper-plane"></i>
-        <span>發送</span>
+     
       </button>
       <div id="tts-toggle">
         <input type="checkbox" id="tts-auto-play" checked>
@@ -840,7 +883,7 @@
   </script>
 
   <footer class="copyright-footer">
-    <p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
+    <p>Copyright © 2025 陳謙. All rights reserved.</p>
   </footer>
 
 <svg style="z-index:9997;position:fixed;bottom:0;right:0" viewBox="0 0 315 27" width="315" height="27">
@@ -849,7 +892,7 @@
 </svg>
 <div style="z-index:9998;font-family:sans-serif;background-color:#292929;padding:2px 8px;position:fixed;bottom:0;right:0;left:0"></div>
 <div style="z-index:9999;color:white;font-size: 0.7rem;font-family:sans-serif;padding: 5px;position:fixed;bottom:0;right:0">
-  <a href="https://pyscript.com/@hugo_wong" id="made-on" target="_blank" style="color:#FFF;text-decoration:none;">Made on pyscript.com</a>&nbsp;│&nbsp;<a href="https://pyscript.com/@hugo_wong/encyclopedia-v2/latest" id="view-code" target="_blank" style="color:#FFF;text-decoration:none;">View Code</a><span id="install-pwa-section" hidden>&nbsp;│&nbsp; <a id="install-pwa" style="cursor:pointer; color:#FFF;">Install</a></span>&nbsp;&nbsp
+  <a href="https://pyscript.com/@hugo_wong" id="made-on" target="_blank" style="color:#FFF;text-decoration:none;">Made on pyscript.com</a> │ <a href="https://pyscript.com/@hugo_wong/encyclopedia-v2/latest" id="view-code" target="_blank" style="color:#FFF;text-decoration:none;">View Code</a><span id="install-pwa-section" hidden> │  <a id="install-pwa" style="cursor:pointer; color:#FFF;">Install</a></span>  
 </div>
 
 <script>
