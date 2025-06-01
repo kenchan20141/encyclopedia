@@ -594,6 +594,10 @@
       return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
     }
 
+var text = "**習慣**";
+var cleanedText = text.replace(/\*\*/g, '');
+console.log(cleanedText); // 輸出 "習慣"
+          
     function parseFormatting(text) {
       // 處理粗體：**text** -> <strong>text</strong>
       text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
