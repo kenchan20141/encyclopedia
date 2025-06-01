@@ -1,3 +1,5 @@
+現在TTS會朗讀粗體的「**」，例如「**習慣**」，TTS會讀成「星號星號習慣星號星號」，我希望強制它不要讀出這些符號，要直接忽略星號讀成「習慣」，請教我如何修訂，在告訴我如何替換代碼。
+
 <script type="text/javascript">
         var gk_isXlsx = false;
         var gk_xlsxFileLookup = {};
@@ -594,10 +596,6 @@
       return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
     }
 
-var text = "**習慣**";
-var cleanedText = text.replace(/\*\*/g, '');
-console.log(cleanedText); // 輸出 "習慣"
-          
     function parseFormatting(text) {
       // 處理粗體：**text** -> <strong>text</strong>
       text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -726,25 +724,29 @@ console.log(cleanedText); // 輸出 "習慣"
     }
 
     async function speak(text) {
-      if ('speechSynthesis' in window && ttsAutoPlay.checked) {
-        const textWithoutParentheses = text.replace(/\([^)]*\)/g, '');
-        const textWithoutEmoji = textWithoutParentheses.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/gu, '');
-        const sentences = textWithoutEmoji.split(/(?<=[。！？])/);
-        for (const sentence of sentences) {
-          if (sentence.trim()) {
-            const utterance = new SpeechSynthesisUtterance(sentence.trim());
-            utterance.lang = 'zh-HK';
-            utterance.rate = 1.05;
-            utterance.pitch = 0.5;
-            speechSynthesis.speak(utterance);
-            await new Promise(resolve => {
-              utterance.onend = resolve;
-            });
-            await new Promise(resolve => setTimeout(resolve, 200));
-          }
-        }
+  if ('speechSynthesis' in window && ttsAutoPlay.checked) {
+    // 去除粗體和斜體的markdown符號
+    text = text.replace(/\*\*(.*?)\*\*/g, '$1');
+    text = text.replace(/\*(.*?)\*/g, '$1');
+    
+    const textWithoutParentheses = text.replace(/\([^)]*\)/g, '');
+    const textWithoutEmoji = textWithoutParentheses.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/gu, '');
+    const sentences = textWithoutEmoji.split(/(?<=[。！？])/);
+    for (const sentence of sentences) {
+      if (sentence.trim()) {
+        const utterance = new SpeechSynthesisUtterance(sentence.trim());
+        utterance.lang = 'zh-HK';
+        utterance.rate = 1.05;
+        utterance.pitch = 0.5;
+        speechSynthesis.speak(utterance);
+        await new Promise(resolve => {
+          utterance.onend = resolve;
+        });
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
+  }
+}
 
     function addMessage(content, role) {
       if (role === 'ai') {
@@ -897,7 +899,7 @@ console.log(cleanedText); // 輸出 "習慣"
   </script>
 
   <footer class="copyright-footer">
-    <p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
+    <p>Copyright © 2025 陳謙. All rights reserved.</p>
   </footer>
 
 </script></body>
