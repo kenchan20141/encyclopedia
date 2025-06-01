@@ -722,11 +722,20 @@
       }
     }
 
-    async function speak(text) {
+  async function speak(text) {
   if ('speechSynthesis' in window && ttsAutoPlay.checked) {
     // 去除粗體和斜體的markdown符號
     text = text.replace(/\*\*(.*?)\*\*/g, '$1');
     text = text.replace(/\*(.*?)\*/g, '$1');
+    
+    // 去除列表符號「- 」
+    text = text.replace(/(?:^|\n)\s*-\s+/g, '\n');
+    
+    // 去除引用符號「> 」
+    text = text.replace(/(?:^|\n)\s*>\s+/g, '\n');
+    
+    // 去除多餘的換行符，確保句子連貫
+    text = text.replace(/\n+/g, '\n').trim();
     
     const textWithoutParentheses = text.replace(/\([^)]*\)/g, '');
     const textWithoutEmoji = textWithoutParentheses.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/gu, '');
