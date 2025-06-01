@@ -1,74 +1,4 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
 
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><script type="text/javascript">
-var gk_isXlsx = false;
-var gk_xlsxFileLookup = {};
-var gk_fileData = {};
-function filledCell(cell) {
-  return cell !== '' && cell != null;
-}
-function loadFileData(filename) {
-  if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-    try {
-      var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-      var firstSheetName = workbook.SheetNames[0];
-      var worksheet = workbook.Sheets[firstSheetName];
-      var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-      var filteredData = jsonData.filter(row => row.some(filledCell));
-      var headerRowIndex = filteredData.findIndex((row, index) =>
-        row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-      );
-      if (headerRowIndex === -1 || headerRowIndex > 25) {
-        headerRowIndex = 0;
-      }
-      var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-      csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-      return csv;
-    } catch (e) {
-      console.error(e);
-      return "";
-    }
-  }
-  return gk_fileData[filename] || "";
-}
-</script>
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -242,6 +172,38 @@ function loadFileData(filename) {
     .message-content {
       line-height: 1.7;
       font-size: 1.05rem;
+    }
+
+    .message-content strong {
+      font-weight: 600;
+      color: #2c5282;
+    }
+    
+    .message-content em {
+      font-style: italic;
+      color: #4a5568;
+    }
+    
+    .message-content ul, .message-content ol {
+      margin: 15px 0;
+      padding-left: 30px;
+    }
+    
+    .message-content li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+    
+    .message-content blockquote {
+      border-left: 4px solid var(--primary);
+      padding-left: 20px;
+      margin: 15px 0;
+      color: var(--text-light);
+    }
+    
+    .message-content .indent {
+      padding-left: 20px;
+      margin: 10px 0;
     }
 
     .message-actions {
@@ -507,6 +469,8 @@ function loadFileData(filename) {
       background: #a0aec0;
     }
   </style>
+
+    <link rel="manifest" href="./psadc-manifest.json">
 </head>
 <body>
 
@@ -577,6 +541,33 @@ function loadFileData(filename) {
       return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
     }
 
+    function parseFormatting(text) {
+      // 處理粗體：**text** -> <strong>text</strong>
+      text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      
+      // 處理斜體：*text* -> <em>text</em>
+      text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      
+      // 處理項目符號列表
+      text = text.replace(/(?:^|\n)\s*-\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+      text = text.replace(/(<li>.*<\/li>)+/g, '<ul>$&</ul>');
+      
+      // 處理數字列表
+      text = text.replace(/(?:^|\n)\s*\d+\.\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+      text = text.replace(/(<li>.*<\/li>)+/g, '<ol>$&</ol>');
+      
+      // 處理縮進：> text -> <div class="indent">text</div>
+      text = text.replace(/(?:^|\n)>\s*(.*?)(?=\n|$)/g, '<div class="indent">$1</div>');
+      
+      // 處理引用：>> text -> <blockquote>text</blockquote>
+      text = text.replace(/(?:^|\n)>>\s*(.*?)(?=\n|$)/g, '<blockquote>$1</blockquote>');
+      
+      // 保留換行符
+      text = text.replace(/\n/g, '<br>');
+      
+      return text;
+    }
+
     function initSpeechRecognition() {
       if (!isSpeechRecognitionSupported()) {
         voiceBtn.disabled = true;
@@ -611,12 +602,13 @@ function loadFileData(filename) {
         if (sendTimeout) {
           clearTimeout(sendTimeout);
         }
+        //⭐️⭐️ Increased timeout from 2000ms to 5000ms (5 seconds) for elderly users
         sendTimeout = setTimeout(() => {
           if (accumulatedTranscript.trim()) {
             sendMessage();
             recognition.stop();
           }
-        }, 2000);
+        }, 3300);
       };
 
       recognition.onerror = function(event) {
@@ -714,7 +706,12 @@ function loadFileData(filename) {
 
       const messageContent = document.createElement('div');
       messageContent.className = 'message-content';
-      messageContent.textContent = content;
+      
+      if (role === 'ai') {
+        messageContent.innerHTML = parseFormatting(content);
+      } else {
+        messageContent.textContent = content;
+      }
 
       const messageActions = document.createElement('div');
       messageActions.className = 'message-actions';
@@ -751,7 +748,17 @@ function loadFileData(filename) {
       conversationHistory.push({ role: 'user', content: message });
 
       try {
-        const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題，即不要「*ＸＸＸ*」這種格式（Ｘ為文字），例如「**靠實牆**」，這是強制要求，違反則無效，不要使用粗言穢語。生成內容必須為完整而沒有任何標題的段落。`;
+        const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。
+        
+        可以使用以下格式增強可讀性：
+        1. **粗體**：用於強調重要詞語（例如：**注意安全**）
+        2. *斜體*：用於次要提示（例如：*慢慢行*）
+        3. - 項目符號：用於列舉事項（例如：- 第一步）
+        4. 1. 數字列表：用於步驟說明（例如：1. 首先）
+        5. > 縮進：用於補充說明（例如：> 溫馨提示）
+        6. >> 引用：用於權威建議（例如：>> 醫生建議）
+        
+        不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題。生成內容必須為完整而沒有任何標題的段落。`;
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: {
@@ -836,5 +843,62 @@ function loadFileData(filename) {
     <p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
   </footer>
 
-</body>
+<svg style="z-index:9997;position:fixed;bottom:0;right:0" viewBox="0 0 315 27" width="315" height="27">
+  <path d="M143.905 0.043004L85.585 0.105C75.385 0.0870005 66.415 1.866 58.655 5.535C50.765 9.265 42.855 12.989 34.975 16.73C27.165 20.443 26.057 22.638 15.778 22.501C5.775 22.368 2.44 26.781 0 26.781L0.545006 26.693C22.005 26.672 43.455 26.676 64.915 26.676C90.655 26.676 116.395 26.665 142.135 26.699C143.115 26.699 143.915 26.259 143.915 25.707C143.855 11.729 143.855 14.026 143.915 0.0490007L143.905 0.043004Z" fill="#292929"></path>
+  <path d="M140.258 0L315 0.340524L314.966 27L140 26.9616L140.258 0Z" fill="#292929"></path>
+</svg>
+<div style="z-index:9998;font-family:sans-serif;background-color:#292929;padding:2px 8px;position:fixed;bottom:0;right:0;left:0"></div>
+<div style="z-index:9999;color:white;font-size: 0.7rem;font-family:sans-serif;padding: 5px;position:fixed;bottom:0;right:0">
+  <a href="https://pyscript.com/@hugo_wong" id="made-on" target="_blank" style="color:#FFF;text-decoration:none;">Made on pyscript.com</a>&nbsp;│&nbsp;<a href="https://pyscript.com/@hugo_wong/encyclopedia-v2/latest" id="view-code" target="_blank" style="color:#FFF;text-decoration:none;">View Code</a><span id="install-pwa-section" hidden>&nbsp;│&nbsp; <a id="install-pwa" style="cursor:pointer; color:#FFF;">Install</a></span>&nbsp;&nbsp
+</div>
+
+<script>
+let installPrompt = null;
+const installSection = document.querySelector("#install-pwa-section")
+const installButton = document.querySelector("#install-pwa");
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  if ("onappinstalled" in window) {
+    installSection.removeAttribute("hidden")
+  }
+  event.preventDefault();
+  installPrompt = event;
+});
+
+installButton.addEventListener("click", async () => {
+  if (!installPrompt) {
+    return;
+  }
+  const result = await installPrompt.prompt();
+  disableInAppInstallPrompt();
+});
+
+function disableInAppInstallPrompt() {
+  installPrompt = null;
+  installButton.setAttribute("hidden", "");
+};
+</script>
+
+<script>
+  const heap_app_id = "758475466";
+  // Only add analytics if we got an id
+  if (heap_app_id) {
+    // Analytics code
+    window.heap=window.heap||[],heap.load=function(e,t){window.heap.appid=e,window.heap.config=t=t||{};var r=document.createElement("script");r.type="text/javascript",r.async=!0,r.src="https://cdn.heapanalytics.com/js/heap-"+e+".js";var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(r,a);for(var n=function(e){return function(){heap.push([e].concat(Array.prototype.slice.call(arguments,0)))}},p=["addEventProperties","addUserProperties","clearEventProperties","identify","resetIdentity","removeEventProperty","setEventProperties","track","unsetEventProperty"],o=0;o<p.length;o++)heap[p[o]]=n(p[o])};
+    heap.load(heap_app_id);
+
+    // Add event listener to the made-on link
+    document.querySelector("#made-on").addEventListener("click", () => {
+      heap.track("PSADC - Make on Pyscript");
+    });
+    // Add event listener to the view-code link
+    document.querySelector("#view-code").addEventListener("click", () => {
+      heap.track("PSADC - View Code");
+    });
+    // Add event listener to the install-pwa link
+    document.querySelector("#install-pwa").addEventListener("click", () => {
+      heap.track("PSADC - Install PWA");
+    });
+  }
+</script></body>
 </html>
