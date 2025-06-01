@@ -767,7 +767,7 @@
         const utterance = new SpeechSynthesisUtterance(sentence.trim());
         utterance.lang = 'zh-HK';
         utterance.rate = 1.05;
-        utterance.pitch = 0.5;
+        utterance.pitch = 1;
         speechSynthesis.speak(utterance);
         await new Promise(resolve => {
           utterance.onend = resolve;
