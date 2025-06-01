@@ -1,9 +1,49 @@
-<!DOCTYPE html>
+
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="zh-HK">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI小百科</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI小百科</title>
 
 <!-- 添加到主畫面設定 -->
 <meta name="application-name" content="AI小百科">
@@ -13,907 +53,699 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
 
-<!-- Android 圖示 -->
-<link rel="icon" sizes="192x192" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
-<link rel="icon" sizes="144x144" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
-<link rel="icon" sizes="96x96" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+  <!-- Android 圖示 -->
+    <link rel="icon" sizes="192x192" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+    <link rel="icon" sizes="144x144" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+    <link rel="icon" sizes="96x96" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+    <!-- iOS 圖示 -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
 
-<!-- iOS 圖示 -->
-<link rel="apple-touch-icon" sizes="180x180" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
-<link rel="apple-touch-icon" sizes="152x152" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
-<link rel="apple-touch-icon" sizes="120x120" href="https://i.ibb.co/MkftPdmG/image-28-1.png">
+        
+  <style>
+    :root {
+      --primary: #4a90e2;
+      --primary-dark: #357abd;
+      --secondary: #50c878;
+      --user-bg: #e6f0fa;
+      --user-border: #4a90e2;
+      --ai-bg: #f0f4f8;
+      --ai-border: #d1e0e8;
+      --error-bg: #ffe6e6;
+      --error-border: #e57373;
+      --recording-bg: #e74c3c;
+      --text-dark: #2d3748;
+      --text-light: #718096;
+      --shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      --radius: 20px;
+      --radius-sm: 12px;
+    }
 
-<style>
-:root {
---primary: #4a90e2;
---primary-dark: #357abd;
---secondary: #50c878;
---user-bg: #e6f0fa;
---user-border: #4a90e2;
---ai-bg: #f0f4f8;
---ai-border: #d1e0e8;
---error-bg: #ffe6e6;
---error-border: #e57373;
---recording-bg: #e74c3c;
---text-dark: #2d3748;
---text-light: #718096;
---shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
---radius: 20px;
---radius-sm: 12px;
+    html {
+      font-size: 24px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Serif TC', 'cwTeXHei', 'cwTeXFangSong', 'cwTeXKai', 'cwTeXMing', 'PingFang TC', 'Microsoft JhengHei', serif;
+      background-image: url('https://i.ibb.co/PvJfB2CW/image.png');
+      background-size: cover;
+      background-position: center;
+      color: var(--text-dark);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 25px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .header h1 {
+      font-size: 2.8rem;
+      font-weight: 700;
+      background: linear-gradient(to right, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .copyright-footer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            padding: 5px 10px;
+            background-color: #f1f1f1;
+        }
+
+        .copyright-footer p {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .copyright-footer p {
+                font-size: 12px;
+            }
+        }
+
+    #chat-container {
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 160px);
+    }
+
+    #chat-header {
+      background: linear-gradient(to right, var(--primary), var(--primary-dark));
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    #chat-header i {
+      font-size: 1.8rem;
+    }
+
+    #chat-header h2 {
+      font-weight: 700;
+      font-size: 1.6rem;
+      flex-grow: 1;
+    }
+
+    #chat-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 25px;
+      background: #f7fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 24px 30px;
+      border-radius: var(--radius-sm);
+      position: relative;
+      box-shadow: var(--shadow);
+      animation: slideIn 0.4s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .user-message {
+      background: var(--user-bg);
+      border-left: 5px solid var(--user-border);
+      align-self: flex-end;
+    }
+
+    .ai-message {
+      background: var(--ai-bg);
+      border-left: 5px solid var(--ai-border);
+      align-self: flex-start;
+    }
+
+    .error-message {
+      background: var(--error-bg);
+      border-left: 5px solid var(--error-border);
+      align-self: center;
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .user-message .message-header {
+      color: var(--primary-dark);
+    }
+
+    .ai-message .message-header {
+      color: var(--secondary);
+    }
+
+    .message-content {
+      line-height: 1.8;
+      font-size: 1.05rem;
+    }
+
+    .message-content strong {
+      font-weight: 600;
+      color: #2c5282;
+    }
+    
+    .message-content em {
+      font-style: italic;
+      color: #4a5568;
+    }
+    
+    .message-content ul, .message-content ol {
+      margin: 15px 0;
+      padding-left: 30px;
+    }
+    
+    .message-content li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+    
+    .message-content blockquote {
+      border-left: 4px solid var(--primary);
+      padding-left: 20px;
+      margin: 15px 0;
+      color: var(--text-light);
+    }
+    
+    .message-content .indent {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    .message-actions {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.8);
+      border: none;
+      border-radius: 50%;
+      width: 2rem;
+      height: 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-light);
+      transition: all 0.3s;
+      font-size: 1.2rem;
+    }
+
+    .copy-btn:hover {
+      background: white;
+      color: var(--primary);
+    }
+
+    .copy-btn.copied {
+      color: var(--secondary);
+      transform: scale(1.15);
+    }
+
+    .copy-btn.copied i::before {
+      content: "\f00c";
+    }
+
+    #input-container {
+      display: flex;
+      padding: 30px;
+      background: white;
+      border-top: 1px solid #edf2f7;
+      gap: 15px;
+      align-items: center;
+      position: relative;
+    }
+
+
+    #user-input {
+      flex: 1;
+      padding: 20px 30px;
+      border: 2px solid #e2e8f0;
+      border-radius: 25px;
+      font-size: 1.1rem;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+     max-width: 100%;   /* 默认最大宽度为视口的90% */
+    }
+
+    #user-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
+    }
+
+    #voice-btn {
+      padding: 0 30px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    #send-btn {
+      padding: 0 30px;
+      background: #45b39d;
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    #voice-btn:hover {
+      background: #a3bffa;
+      transform: translateY(-2px);
+    }
+
+    #send-btn:hover {
+      background: #45b39d;
+      transform: translateY(-2px);
+    }
+
+    #voice-btn:disabled {
+      background: #a3bffa;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #send-btn:disabled {
+      background: #45b39d;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #voice-btn.recording {
+      background: var(--recording-bg);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+   #tts-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  color: var(--text-dark);
 }
 
-html {
-font-size: 24px;
-}
-
-* {
-margin: 0;
-padding: 0;
-box-sizing: border-box;
-}
-
-body {
-font-family: 'Noto Serif TC', 'cwTeXHei', 'cwTeXFangSong', 'cwTeXKai', 'cwTeXMing', 'PingFang TC', 'Microsoft JhengHei', serif;
-background-image: url('https://i.ibb.co/PvJfB2CW/image.png');
-background-size: cover;
-background-position: center;
-color: var(--text-dark);
-min-height: 100vh;
-display: flex;
-flex-direction: column;
-padding: 25px;
-}
-
-.header {
-text-align: center;
-margin-bottom: 40px;
-max-width: 900px;
-margin-left: auto;
-margin-right: auto;
-}
-
-.copyright-footer {
-position: fixed;
-bottom: 0;
-right: 0;
-padding: 5px 10px;
-background-color: #f1f1f1;
-z-index: 10;
-}
-
-.copyright-footer p {
-margin: 0;
-font-size: 14px;
-}
-
-@media (max-width: 600px) {
-.copyright-footer p {
-font-size: 12px;
-}
-}
-
-#chat-container {
-max-width: 900px;
-width: 100%;
-margin: 0 auto;
-background: white;
-border-radius: var(--radius);
-box-shadow: var(--shadow);
-overflow: hidden;
-display: flex;
-flex-direction: column;
-height: calc(100vh - 160px);
-}
-
-#chat-header {
-background: linear-gradient(to right, var(--primary), var(--primary-dark));
-color: white;
-padding: 20px 30px;
-display: flex;
-align-items: center;
-gap: 15px;
-}
-
-#chat-header i {
-font-size: 1.8rem;
-}
-
-#chat-header h2 {
-font-weight: 700;
-font-size: 1.6rem;
-flex-grow: 1;
-}
-
-#chat-output {
-flex: 1;
-overflow-y: auto;
-padding: 25px;
-background: #f7fafc;
-display: flex;
-flex-direction: column;
-gap: 25px;
-}
-
-.message {
-max-width: 80%;
-padding: 24px 30px;
-border-radius: var(--radius-sm);
-position: relative;
-box-shadow: var(--shadow);
-animation: slideIn 0.4s ease;
-}
-
-@keyframes slideIn {
-from { opacity: 0; transform: translateX(-20px); }
-to { opacity: 1; transform: translateX(0); }
-}
-
-.user-message {
-background: var(--user-bg);
-border-left: 5px solid var(--user-border);
-align-self: flex-end;
-}
-
-.ai-message {
-background: var(--ai-bg);
-border-left: 5px solid var(--ai-border);
-align-self: flex-start;
-}
-
-.error-message {
-background: var(--error-bg);
-border-left: 5px solid var(--error-border);
-align-self: center;
-}
-
-.message-header {
-display: flex;
-align-items: center;
-gap: 12px;
-margin-bottom: 12px;
-font-weight: 600;
-}
-
-.user-message .message-header {
-color: var(--primary-dark);
-}
-
-.ai-message .message-header {
-color: var(--secondary);
-}
-
-.message-content {
-line-height: 1.8;
-font-size: 1.05rem;
-}
-
-.message-content strong {
-font-weight: 600;
-color: #2c5282;
-}
-
-.message-content em {
-font-style: italic;
-color: #4a5568;
-}
-
-.message-content ul, .message-content ol {
-margin: 15px 0;
-padding-left: 30px;
-}
-
-.message-content li {
-margin-bottom: 8px;
-line-height: 1.6;
-}
-
-.message-content blockquote {
-border-left: 4px solid var(--primary);
-padding-left: 20px;
-margin: 15px 0;
-color: var(--text-light);
-}
-
-.message-content .indent {
-padding-left: 20px;
-margin: 10px 0;
-}
-
-.message-actions {
-position: absolute;
-top: 12px;
-right: 12px;
-display: flex;
-gap: 10px;
-}
-
-.copy-btn {
-background: rgba(255, 255, 255, 0.8);
-border: none;
-border-radius: 50%;
-width: 2rem;
-height: 2rem;
-display: flex;
-align-items: center;
-justify-content: center;
-cursor: pointer;
-color: var(--text-light);
-transition: all 0.3s;
-font-size: 1.2rem;
-}
-
-.copy-btn:hover {
-background: white;
-color: var(--primary);
-}
-
-.copy-btn.copied {
-color: var(--secondary);
-transform: scale(1.15);
-}
-
-.copy-btn.copied i::before {
-content: "\f00c";
-}
-
-#input-container {
-display: flex;
-padding: 30px;
-background: white;
-border-top: 1px solid #edf2f7;
-gap: 15px;
-align-items: center;
-position: relative;
-}
-
-#user-input {
-flex: 1;
-padding: 20px 30px;
-border: 2px solid #e2e8f0;
-border-radius: 25px;
-font-size: 1.1rem;
-outline: none;
-transition: border-color 0.3s, box-shadow 0.3s;
-max-width: 100%;
-}
-
-#user-input:focus {
-border-color: var(--primary);
-box-shadow: 0 0 8px rgba(74, 144, 226, 0.3);
-}
-
-#voice-btn {
-padding: 0 30px;
-background: var(--primary);
-color: white;
-border: none;
-border-radius: 25px;
-cursor: pointer;
-font-size: 1.1rem;
-height: 60px;
-display: flex;
-align-items: center;
-gap: 10px;
-transition: background 0.3s, transform 0.2s;
-}
-
-#send-btn {
-padding: 0 30px;
-background: #45b39d;
-color: white;
-border: none;
-border-radius: 25px;
-cursor: pointer;
-font-size: 1.1rem;
-height: 60px;
-display: flex;
-align-items: center;
-gap: 10px;
-transition: background 0.3s, transform 0.2s;
-}
-
-#voice-btn:hover {
-background: #a3bffa;
-transform: translateY(-2px);
-}
-
-#send-btn:hover {
-background: #45b39d;
-transform: translateY(-2px);
-}
-
-#voice-btn:disabled {
-background: #a3bffa;
-cursor: not-allowed;
-transform: none;
-}
-
-#send-btn:disabled {
-background: #45b39d;
-cursor: not-allowed;
-transform: none;
-}
-
-#voice-btn.recording {
-background: var(--recording-bg);
-animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-0% { transform: scale(1); }
-50% { transform: scale(1.05); }
-100% { transform: scale(1); }
-}
-
-#tts-toggle {
-display: flex;
-align-items: center;
-gap: 10px;
-font-size: 1.1rem;
-color: var(--text-dark);
-}
-
+/* 平板设备或小屏幕 */
 @media (max-width: 768px) {
-#tts-toggle {
-display: block;
-margin-top: 10px;
-}
-}
-
-.typing-indicator {
-display: none;
-padding: 15px 20px;
-background: var(--ai-bg);
-border-radius: var(--radius-sm);
-align-self: flex-start;
-box-shadow: var(--shadow);
+  #tts-toggle {
+    display: block;
+    margin-top: 10px;
+  }
 }
 
-.typing-indicator span {
-height: 12px;
-width: 12px;
-background: var(--text-light);
-border-radius: 50%;
-display: inline-block;
-margin: 0 3px;
-animation: typing 1s infinite;
-}
+    .typing-indicator {
+      display: none;
+      padding: 15px 20px;
+      background: var(--ai-bg);
+      border-radius: var(--radius-sm);
+      align-self: flex-start;
+      box-shadow: var(--shadow);
+    }
 
-.typing-indicator span:nth-child(2) {
-animation-delay: 0.2s;
-}
+    .typing-indicator span {
+      height: 12px;
+      width: 12px;
+      background: var(--text-light);
+      border-radius: 50%;
+      display: inline-block;
+      margin: 0 3px;
+      animation: typing 1s infinite;
+    }
 
-.typing-indicator span:nth-child(3) {
-animation-delay: 0.4s;
-}
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
 
-@keyframes typing {
-0%, 100% { transform: translateY(0); }
-50% { transform: translateY(-6px); }
-}
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
 
-.recording-indicator {
-position: absolute;
-top: -40px;
-left: 50%;
-transform: translateX(-50%);
-background: var(--recording-bg);
-color: white;
-padding: 8px 15px;
-border-radius: 20px;
-font-size: 0.9rem;
-display: flex;
-align-items: center;
-gap: 8px;
-animation: slideDown 0.3s ease;
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
+    @keyframes typing {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
 
-@keyframes slideDown {
-from { top: -60px; opacity: 0; }
-to { top: -40px; opacity: 1; }
-}
+    .recording-indicator {
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--recording-bg);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: slideDown 0.3s ease;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
 
-.recording-indicator i {
-animation: blink 1s infinite;
-}
+    @keyframes slideDown {
+      from { top: -60px; opacity: 0; }
+      to { top: -40px; opacity: 1; }
+    }
 
-.swipe-hint {
-position: absolute;
-top: 0px;
-left: 50%;
-transform: translateX(-50%);
-background: rgba(0, 0, 0, 0.7);
-color: white;
-padding: 6px 12px;
-border-radius: 15px;
-font-size: 0.8rem;
-display: none;
-}
+    .recording-indicator i {
+      animation: blink 1s infinite;
+    }
 
-@media (max-width: 768px) {
-#chat-container {
-height: calc(100vh - 120px);
-}
-#input-container {
-padding: 20px;
-}
-.header h1 {
-font-size: 2.2rem;
-}
-#voice-btn, #send-btn {
-padding: 0 15px;
-font-size: 1rem;
-}
-}
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
 
-@media (max-width: 480px) {
-#input-container {
-flex-wrap: wrap;
-gap: 10px;
-}
-#voice-btn, #send-btn {
-padding: 0 15px;
-width: 48%;
-font-size: 0.9rem;
-}
-.swipe-hint {
-top: 0px;
-font-size: 0.7rem;
-}
-#tts-toggle {
-order: 3;
-width: 100%;
-justify-content: center;
-margin-top: 10px;
-}
-}
+    .swipe-hint {
+      position: absolute;
+      top: 0px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      display: none;
+    }
 
-::-webkit-scrollbar {
-width: 10px;
-}
+    @media (max-width: 768px) {
+      #chat-container {
+        height: calc(100vh - 120px);
+      }
+      #input-container {
+        padding: 20px;
+      }
+      .header h1 {
+        font-size: 2.2rem;
+      }
+      #voice-btn, #send-btn {
+        padding: 0 15px;
+        font-size: 1rem;
+      }
+    }
 
-::-webkit-scrollbar-track {
-background: #edf2f7;
-}
+    @media (max-width: 480px) {
+      #input-container {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      #voice-btn, #send-btn {
+        padding: 0 15px;
+        width: 48%;
+        font-size: 0.9rem;
+      }
+      .swipe-hint {
+        top: 0px;
+        font-size: 0.7rem;
+      }
+      #tts-toggle {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        margin-top: 10px;
+      }
+    }
 
-::-webkit-scrollbar-thumb {
-background: #cbd5e0;
-border-radius: 5px;
-}
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
 
-::-webkit-scrollbar-thumb:hover {
-background: #a0aec0;
-}
+    ::-webkit-scrollbar-track {
+      background: #edf2f7;
+    }
 
-/* VYUBER 頭像相關樣式 */
-.vtuber-container {
-width: 150px;
-height: 150px;
-background: rgba(255, 255, 255, 0.9);
-border-radius: 50%;
-box-shadow: var(--shadow);
-overflow: hidden;
-display: flex;
-align-items: center;
-justify-content: center;
-position: fixed;
-bottom: 30px;
-right: 30px;
-z-index: 100;
-border: 3px solid var(--primary);
-transition: all 0.3s ease;
-cursor: grab;
-}
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 5px;
+    }
 
-.vtuber-avatar {
-width: 100%;
-height: 100%;
-position: relative;
-display: flex;
-align-items: center;
-justify-content: center;
-}
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
+  </style>
 
-.vtuber-face {
-width: 120px;
-height: 120px;
-border-radius: 50%;
-background: #fde2e4;
-position: relative;
-overflow: hidden;
-}
-
-.vtuber-eyes {
-position: absolute;
-top: 40%;
-left: 50%;
-transform: translate(-50%, -50%);
-width: 90px;
-height: 25px;
-display: flex;
-justify-content: space-between;
-}
-
-.vtuber-eye {
-width: 30px;
-height: 20px;
-background: #fff;
-border-radius: 50%;
-position: relative;
-display: flex;
-align-items: center;
-justify-content: center;
-}
-
-.vtuber-pupil {
-width: 12px;
-height: 12px;
-background: #333;
-border-radius: 50%;
-position: absolute;
-animation: blink 4s infinite;
-}
-
-.vtuber-mouth {
-position: absolute;
-bottom: 30px;
-left: 50%;
-transform: translateX(-50%);
-width: 40px;
-height: 15px;
-background: #ff9aa2;
-border-radius: 0 0 20px 20px;
-transition: all 0.2s ease;
-overflow: hidden;
-}
-
-.vtuber-mouth.talking {
-height: 25px;
-animation: talking 0.3s infinite alternate;
-}
-
-.vtuber-mouth-inner {
-width: 100%;
-height: 10px;
-background: #990000;
-border-radius: 50% / 100%;
-position: absolute;
-bottom: 0;
-}
-
-@keyframes talking {
-from { height: 15px; }
-to { height: 25px; }
-}
-
-@keyframes blink {
-0%, 5%, 15%, 100% { transform: scaleY(1); }
-10% { transform: scaleY(0.1); }
-}
-
-/* 移動端適配 */
-@media (max-width: 768px) {
-.vtuber-container {
-width: 100px;
-height: 100px;
-bottom: 20px;
-right: 20px;
-}
-
-.vtuber-face {
-width: 80px;
-height: 80px;
-}
-
-.vtuber-eyes {
-width: 60px;
-height: 15px;
-}
-
-.vtuber-eye {
-width: 20px;
-height: 15px;
-}
-
-.vtuber-pupil {
-width: 8px;
-height: 8px;
-}
-
-.vtuber-mouth {
-width: 30px;
-height: 10px;
-bottom: 20px;
-}
-
-.vtuber-mouth.talking {
-height: 12px;
-}
-}
-</style>
-
+    
 </head>
 <body>
-<!-- VTUBER 頭像動畫顯示區 -->
-<div class="vtuber-container" id="vtuber-container">
-    <div class="vtuber-avatar">
-        <div class="vtuber-face">
-            <div class="vtuber-eyes">
-                <div class="vtuber-eye">
-                    <div class="vtuber-pupil"></div>
-                </div>
-                <div class="vtuber-eye">
-                    <div class="vtuber-pupil"></div>
-                </div>
-            </div>
-            <div class="vtuber-mouth" id="vtuber-mouth">
-                <div class="vtuber-mouth-inner"></div>
-            </div>
-        </div>
+
+  <div id="chat-container">
+    <div id="chat-header">
+      <i class="fas fa-robot"></i>
+      <h2>AI小百科</h2>
     </div>
-</div>
 
-<div id="chat-container">
-<div id="chat-header">
-<i class="fas fa-robot"></i>
-<h2>AI小百科</h2>
-</div>
+    <div id="chat-output">
+      <!-- Initial message will be added via JavaScript -->
+    </div>
 
-<div id="chat-output">
-<!-- Initial message will be added via JavaScript -->
-</div>
+    <div class="typing-indicator" id="typing-indicator">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
 
-<div class="typing-indicator" id="typing-indicator">
-<span></span>
-<span></span>
-<span></span>
-</div>
+    <div id="input-container">
+      <input type="text" id="user-input" placeholder="輸入你的問題..." />
+      <button id="voice-btn" title="點擊語音輸入">
+        <i class="fas fa-microphone" style="display: block; margin: 0 auto;"></i>
 
-<div id="input-container">
-<input type="text" id="user-input" placeholder="輸入你的問題..." />
-<button id="voice-btn" title="點擊語音輸入">
-<i class="fas fa-microphone" style="display: block; margin: 0 auto;"></i>
-</button>
-<button id="send-btn">
-<i class="fas fa-paper-plane" style="display: block; margin: 0 auto;"></i>
-</button>
-<div id="tts-toggle">
-<input type="checkbox" id="tts-auto-play" checked>
-<label for="tts-auto-play">自動播放語音</label>
-</div>
-<div class="recording-indicator" id="recording-indicator" style="display: none;">
-<i class="fas fa-circle"></i> 正在聆聽...
-</div>
-<div class="swipe-hint" id="swipe-hint">
-滑動取消
-</div>
-</div>
-</div>
+      </button>
+      <button id="send-btn">
+       <i class="fas fa-paper-plane" style="display: block; margin: 0 auto;"></i>
+     
+      </button>
+      <div id="tts-toggle">
+        <input type="checkbox" id="tts-auto-play" checked>
+        <label for="tts-auto-play">自動播放語音</label>
+      </div>
+      <div class="recording-indicator" id="recording-indicator" style="display: none;">
+        <i class="fas fa-circle"></i> 正在聆聽...
+      </div>
+      <div class="swipe-hint" id="swipe-hint">
+        滑動取消
+      </div>
+    </div>
+  </div>
 
-<footer class="copyright-footer">
-<p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
-</footer>
+  <script>
+    const API_KEYS = [
+      "sk-MoqwsgO8P9MEoCrftvdSYA",
+      "sk-04KvBMK1EUyinjzdCb1wXQ"
+    ];
+    let currentApiKeyIndex = 0;
+    const API_URL = "https://chatapi.akash.network/api/v1/chat/completions";
+    const MODEL = "DeepSeek-R1-0528";
 
-<script>
-const API_KEYS = [
-"sk-MoqwsgO8P9MEoCrftvdSYA",
-"sk-04KvBMK1EUyinjzdCb1wXQ"
-];
-let currentApiKeyIndex = 0;
-const API_URL = "https://chatapi.akash.network/api/v1/chat/completions";
-const MODEL = "DeepSeek-R1-0528";
+    const chatOutput = document.getElementById('chat-output');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const voiceBtn = document.getElementById('voice-btn');
+    const typingIndicator = document.getElementById('typing-indicator');
+    const ttsAutoPlay = document.getElementById('tts-auto-play');
+    const recordingIndicator = document.getElementById('recording-indicator');
+    const swipeHint = document.getElementById('swipe-hint');
+    let conversationHistory = [];
+    let isRecording = false;
+    let touchStartY, touchStartX;
+    const SWIPE_THRESHOLD = 100;
+    let accumulatedTranscript = '';
+    let sendTimeout;
 
-const chatOutput = document.getElementById('chat-output');
-const userInput = document.getElementById('user-input');
-const sendBtn = document.getElementById('send-btn');
-const voiceBtn = document.getElementById('voice-btn');
-const typingIndicator = document.getElementById('typing-indicator');
-const ttsAutoPlay = document.getElementById('tts-auto-play');
-const recordingIndicator = document.getElementById('recording-indicator');
-const swipeHint = document.getElementById('swipe-hint');
-const vtuberMouth = document.getElementById('vtuber-mouth');
-const vtuberContainer = document.getElementById('vtuber-container');
-let conversationHistory = [];
-let isRecording = false;
-let touchStartY, touchStartX;
-const SWIPE_THRESHOLD = 100;
-let accumulatedTranscript = '';
-let sendTimeout;
-let isTalking = false;
-let currentUtterance = null;
-
-// VTUBER 嘴型動畫控制
-function startTalking() {
-    if (!isTalking) {
-        isTalking = true;
-        vtuberMouth.classList.add('talking');
-        // 當開始說話時，強調顯示VTUBER頭像
-        vtuberContainer.style.transform = 'scale(1.1)';
-        vtuberContainer.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.2)';
+    function isSpeechRecognitionSupported() {
+      return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
     }
-}
 
-function stopTalking() {
-    if (isTalking) {
-        isTalking = false;
-        vtuberMouth.classList.remove('talking');
-        // 當停止說話時，恢復VTUBER頭像的正常狀態
-        vtuberContainer.style.transform = '';
-        vtuberContainer.style.boxShadow = '';
+    function parseFormatting(text) {
+      // 處理粗體：**text** -> <strong>text</strong>
+      text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      
+      // 處理斜體：*text* -> <em>text</em>
+      text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      
+      // 處理項目符號列表
+      text = text.replace(/(?:^|\n)\s*-\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+      text = text.replace(/(<li>.*<\/li>)+/g, '<ul>$&</ul>');
+      
+      // 處理數字列表
+      text = text.replace(/(?:^|\n)\s*\d+\.\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
+      text = text.replace(/(<li>.*<\/li>)+/g, '<ol>$&</ol>');
+      
+      // 處理縮進：> text -> <div class="indent">text</div>
+      text = text.replace(/(?:^|\n)>\s*(.*?)(?=\n|$)/g, '<div class="indent">$1</div>');
+      
+      // 處理引用：>> text -> <blockquote>text</blockquote>
+      text = text.replace(/(?:^|\n)>>\s*(.*?)(?=\n|$)/g, '<blockquote>$1</blockquote>');
+      
+      // 保留換行符
+      text = text.replace(/\n/g, '<br>');
+      
+      return text;
     }
-}
 
-// 隨機眨眼動畫
-function randomBlinking() {
-    const pupils = document.querySelectorAll('.vtuber-pupil');
-    const randomTime = Math.floor(Math.random() * 4000) + 2000;
-    
-    setTimeout(() => {
-        pupils.forEach(pupil => {
-            pupil.style.animation = 'blink 0.3s ease';
-            setTimeout(() => {
-                pupil.style.animation = '';
-                randomBlinking();
-            }, 300);
-        });
-    }, randomTime);
-}
+    function initSpeechRecognition() {
+      if (!isSpeechRecognitionSupported()) {
+        voiceBtn.disabled = true;
+        voiceBtn.title = '您的瀏覽器不支援語音輸入';
+        return null;
+      }
 
-// 啟動隨機眨眼
-randomBlinking();
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'zh-HK';
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-function isSpeechRecognitionSupported() {
-return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-}
+      recognition.onstart = function() {
+        console.log('Speech recognition started');
+        accumulatedTranscript = '';
+        isRecording = true;
+        voiceBtn.classList.add('recording');
+        recordingIndicator.style.display = 'flex';
+        swipeHint.style.display = 'block';
+        voiceBtn.title = '正在語音輸入，滑動取消';
+      };
 
-function parseFormatting(text) {
-// 處理粗體：**text** -> <strong>text</strong>
-text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-// 處理斜體：*text* -> <em>text</em>
-text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-// 處理項目符號列表
-text = text.replace(/(?:^|\n)\s*-\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
-text = text.replace(/(<li>.*<\/li>)+/g, '<ul>$&</ul>');
-
-// 處理數字列表
-text = text.replace(/(?:^|\n)\s*\d+\.\s+(.*?)(?=\n|$)/g, '<li>$1</li>');
-text = text.replace(/(<li>.*<\/li>)+/g, '<ol>$&</ol>');
-
-// 處理縮進：> text -> <div class="indent">text</div>
-text = text.replace(/(?:^|\n)>\s*(.*?)(?=\n|$)/g, '<div class="indent">$1</div>');
-
-// 處理引用：>> text -> <blockquote>text</blockquote>
-text = text.replace(/(?:^|\n)>>\s*(.*?)(?=\n|$)/g, '<blockquote>$1</blockquote>');
-
-// 保留換行符
-text = text.replace(/\n/g, '<br>');
-
-return text;
-}
-
-function initSpeechRecognition() {
-if (!isSpeechRecognitionSupported()) {
-voiceBtn.disabled = true;
-voiceBtn.title = '您的瀏覽器不支援語音輸入';
-return null;
-}
-
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-const recognition = new SpeechRecognition();
-recognition.lang = 'zh-HK';
-recognition.continuous = true;
-recognition.interimResults = true;
-
-recognition.onstart = function() {
-console.log('Speech recognition started');
-accumulatedTranscript = '';
-isRecording = true;
-voiceBtn.classList.add('recording');
-recordingIndicator.style.display = 'flex';
-swipeHint.style.display = 'block';
-voiceBtn.title = '正在語音輸入，滑動取消';
-};
-
-recognition.onresult = function(event) {
-let transcript = '';
-for (let i = 0; i < event.results.length; i++) {
-transcript += event.results[i][0].transcript;
-}
-accumulatedTranscript = transcript;
-userInput.value = accumulatedTranscript;
-
-if (sendTimeout) {
-clearTimeout(sendTimeout);
-}
-//⭐️⭐️ Increased timeout for elderly users
-sendTimeout = setTimeout(() => {
-if (accumulatedTranscript.trim()) {
-sendMessage();
-recognition.stop();
-}
-}, 3300);
-};
-
-recognition.onerror = function(event) {
-console.error('語音識別錯誤:', event.error);
-addMessage(`語音輸入出錯: ${event.error}`, 'error');
-stopRecording();
-};
-
-recognition.onend = function() {
-stopRecording();
-};
-
-return recognition;
-}
-
-let recognition = initSpeechRecognition();
-
-function startRecording() {
-if (!recognition || voiceBtn.disabled) return;
-if (speechSynthesis.speaking) {
-    speechSynthesis.cancel();
-    if (currentUtterance) {
-        currentUtterance.onend = null;
-    }
-    stopTalking();
-}
-try {
-recognition.start();
-} catch (error) {
-console.error('啟動語音識別失敗:', error);
-addMessage('啟動麥克風失敗，請確保已授予權限', 'error');
-stopRecording();
-}
-}
-
-function stopRecording() {
-isRecording = false;
-voiceBtn.classList.remove('recording');
-recordingIndicator.style.display = 'none';
-swipeHint.style.display = 'none';
-voiceBtn.title = '點擊語音輸入';
-voiceBtn.disabled = false;
-if (sendTimeout) {
-clearTimeout(sendTimeout);
-}
-}
-
-function checkSwipe(e) {
-if (!isRecording) return;
-let currentX, currentY;
-if (e.type === 'touchmove') {
-currentX = e.touches[0].clientX;
-currentY = e.touches[0].clientY;
-} else {
-currentX = e.clientX;
-currentY = e.clientY;
-}
-const deltaX = Math.abs(currentX - touchStartX);
-const deltaY = Math.abs(currentY - touchStartY);
-if (deltaX > SWIPE_THRESHOLD || deltaY > SWIPE_THRESHOLD) {
-recognition.stop();
-addMessage('語音輸入已取消', 'error');
-}
-}
-
-async function speak(text) {
-if ('speechSynthesis' in window && ttsAutoPlay.checked) {
-    // 取消任何正在進行的語音
-    if (speechSynthesis.speaking) {
-        speechSynthesis.cancel();
-        if (currentUtterance) {
-            currentUtterance.onend = null;
+      recognition.onresult = function(event) {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
         }
-        stopTalking();
+        accumulatedTranscript = transcript;
+        userInput.value = accumulatedTranscript;
+
+        if (sendTimeout) {
+          clearTimeout(sendTimeout);
+        }
+        //⭐️⭐️ Increased timeout from 2000ms to 5000ms (5 seconds) for elderly users
+        sendTimeout = setTimeout(() => {
+          if (accumulatedTranscript.trim()) {
+            sendMessage();
+            recognition.stop();
+          }
+        }, 3300);
+      };
+
+      recognition.onerror = function(event) {
+        console.error('語音識別錯誤:', event.error);
+        addMessage(`語音輸入出錯: ${event.error}`, 'error');
+        stopRecording();
+      };
+
+      recognition.onend = function() {
+        stopRecording();
+      };
+
+      return recognition;
     }
-    
+
+    let recognition = initSpeechRecognition();
+
+    function startRecording() {
+      if (!recognition || voiceBtn.disabled) return;
+      speechSynthesis.cancel(); // 停止正在播放的語音
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error('啟動語音識別失敗:', error);
+        addMessage('啟動麥克風失敗，請確保已授予權限', 'error');
+        stopRecording();
+      }
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      voiceBtn.classList.remove('recording');
+      recordingIndicator.style.display = 'none';
+      swipeHint.style.display = 'none';
+      voiceBtn.title = '點擊語音輸入';
+      voiceBtn.disabled = false;
+      if (sendTimeout) {
+        clearTimeout(sendTimeout);
+      }
+    }
+
+    function checkSwipe(e) {
+      if (!isRecording) return;
+      let currentX, currentY;
+      if (e.type === 'touchmove') {
+        currentX = e.touches[0].clientX;
+        currentY = e.touches[0].clientY;
+      } else {
+        currentX = e.clientX;
+        currentY = e.clientY;
+      }
+      const deltaX = Math.abs(currentX - touchStartX);
+      const deltaY = Math.abs(currentY - touchStartY);
+      if (deltaX > SWIPE_THRESHOLD || deltaY > SWIPE_THRESHOLD) {
+        recognition.stop();
+        addMessage('語音輸入已取消', 'error');
+      }
+    }
+
+  async function speak(text) {
+  if ('speechSynthesis' in window && ttsAutoPlay.checked) {
     // 去除粗體和斜體的markdown符號
     text = text.replace(/\*\*(.*?)\*\*/g, '$1');
     text = text.replace(/\*(.*?)\*/g, '$1');
@@ -930,265 +762,173 @@ if ('speechSynthesis' in window && ttsAutoPlay.checked) {
     const textWithoutParentheses = text.replace(/\([^)]*\)/g, '');
     const textWithoutEmoji = textWithoutParentheses.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2700}-\u{27BF}]/gu, '');
     const sentences = textWithoutEmoji.split(/(?<=[。！？])/);
-    
     for (const sentence of sentences) {
-        if (sentence.trim()) {
-            const utterance = new SpeechSynthesisUtterance(sentence.trim());
-            utterance.lang = 'zh-HK';
-            utterance.rate = 1.05;
-            utterance.pitch = 1;
-            
-            // 開始說話時啟動嘴型動畫
-            utterance.onstart = function() {
-                startTalking();
-            };
-            
-            // 語音暫停時停止嘴型動畫
-            utterance.onpause = function() {
-                stopTalking();
-            };
-            
-            // 語音恢復時重新啟動嘴型動畫
-            utterance.onresume = function() {
-                startTalking();
-            };
-            
-            // 語音結束時停止嘴型動畫
-            utterance.onend = function() {
-                stopTalking();
-            };
-            
-            // 語音出錯時停止嘴型動畫
-            utterance.onerror = function() {
-                stopTalking();
-            };
-            
-            currentUtterance = utterance;
-            speechSynthesis.speak(utterance);
-            
-            await new Promise(resolve => {
-                utterance.onend = resolve;
-            });
-            
-            await new Promise(resolve => setTimeout(resolve, 200));
-        }
+      if (sentence.trim()) {
+        const utterance = new SpeechSynthesisUtterance(sentence.trim());
+        utterance.lang = 'zh-HK';
+        utterance.rate = 1.05;
+        utterance.pitch = 1;
+        speechSynthesis.speak(utterance);
+        await new Promise(resolve => {
+          utterance.onend = resolve;
+        });
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
     }
-    
-    // 確保語音結束後停止嘴型動畫
-    stopTalking();
-}
+  }
 }
 
-function addMessage(content, role) {
-if (role === 'ai') {
-content = content.replace(/<think>[\s\S]*?<\/think>/g, '');
-}
+    function addMessage(content, role) {
+      if (role === 'ai') {
+        content = content.replace(/<think>[\s\S]*?<\/think>/g, '');
+      }
 
-const messageDiv = document.createElement('div');
-messageDiv.className = `message ${role === 'ai' ? 'ai-message' : role === 'user' ? 'user-message' : 'error-message'}`;
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role === 'ai' ? 'ai-message' : role === 'user' ? 'user-message' : 'error-message'}`;
 
-const messageHeader = document.createElement('div');
-messageHeader.className = 'message-header';
-messageHeader.innerHTML = `
-<i class="fas ${role === 'ai' ? 'fa-robot' : 'fa-user'}"></i>
-<span>${role === 'ai' ? 'AI小百科' : '你'}</span>
-`;
+      const messageHeader = document.createElement('div');
+      messageHeader.className = 'message-header';
+      messageHeader.innerHTML = `
+        <i class="fas ${role === 'ai' ? 'fa-robot' : 'fa-user'}"></i>
+        <span>${role === 'ai' ? 'AI小百科' : '你'}</span>
+      `;
 
-const messageContent = document.createElement('div');
-messageContent.className = 'message-content';
+      const messageContent = document.createElement('div');
+      messageContent.className = 'message-content';
+      
+      if (role === 'ai') {
+        messageContent.innerHTML = parseFormatting(content);
+      } else {
+        messageContent.textContent = content;
+      }
 
-if (role === 'ai') {
-messageContent.innerHTML = parseFormatting(content);
-} else {
-messageContent.textContent = content;
-}
+      const messageActions = document.createElement('div');
+      messageActions.className = 'message-actions';
+      if (role === 'ai') {
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.title = '複製回應';
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(content);
+          copyBtn.classList.add('copied');
+          setTimeout(() => copyBtn.classList.remove('copied'), 2000);
+        });
+        messageActions.appendChild(copyBtn);
+      }
 
-const messageActions = document.createElement('div');
-messageActions.className = 'message-actions';
-if (role === 'ai') {
-const copyBtn = document.createElement('button');
-copyBtn.className = 'copy-btn';
-copyBtn.title = '複製回應';
-copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
-copyBtn.addEventListener('click', () => {
-navigator.clipboard.writeText(content);
-copyBtn.classList.add('copied');
-setTimeout(() => copyBtn.classList.remove('copied'), 2000);
-});
-messageActions.appendChild(copyBtn);
-}
+      messageDiv.appendChild(messageHeader);
+      messageDiv.appendChild(messageContent);
+      if (role === 'ai') messageDiv.appendChild(messageActions);
+      chatOutput.appendChild(messageDiv);
+      chatOutput.scrollTop = chatOutput.scrollHeight;
+    }
 
-messageDiv.appendChild(messageHeader);
-messageDiv.appendChild(messageContent);
-if (role === 'ai') messageDiv.appendChild(messageActions);
-chatOutput.appendChild(messageDiv);
-chatOutput.scrollTop = chatOutput.scrollHeight;
-}
+    async function sendMessage() {
+      const message = userInput.value.trim();
+      if (!message) return;
 
-async function sendMessage() {
-const message = userInput.value.trim();
-if (!message) return;
+      addMessage(message, 'user');
+      userInput.value = '';
+      sendBtn.disabled = true;
+      voiceBtn.disabled = true;
+      typingIndicator.style.display = 'block';
 
-addMessage(message, 'user');
-userInput.value = '';
-sendBtn.disabled = true;
-voiceBtn.disabled = true;
-typingIndicator.style.display = 'block';
+      conversationHistory.push({ role: 'user', content: message });
 
-conversationHistory.push({ role: 'user', content: message });
+      try {
+        const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。
+        
+        可以使用以下格式增強可讀性：
+        1. **粗體**：用於強調重要詞語（例如：**注意安全**）
+        2. *斜體*：用於次要提示（例如：*慢慢行*）
+        3. 1. 數字列表：用於步驟說明（例如：1. 首先）
 
-try {
-const systemPrompt = `你是一個專門為老人家設計的小百科 AI，負責回答生活常識問題。請用粵語和繁體字回應，語氣要貼近生活，使用 emoji，回覆內容不要多於一百字，但必須完整，不可在語句中間中斷。而且，要言必有據，但不能有太多老人家不能理解的資料，適時可以打比喻說明。
+        
+        不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題。生成內容必須為完整而沒有任何標題的段落。`;
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${API_KEYS[currentApiKeyIndex]}`
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...conversationHistory
+            ],
+            max_tokens: 64000
+          })
+        });
 
-可以使用以下格式增強可讀性：
-1. **粗體**：用於強調重要詞語（例如：**注意安全**）
-2. *斜體*：用於次要提示（例如：*慢慢行*）
-3. 1. 數字列表：用於步驟說明（例如：1. 首先）
+        if (!response.ok) {
+          if (response.status === 429 && currentApiKeyIndex < API_KEYS.length - 1) {
+            currentApiKeyIndex++;
+            addMessage('API 限制，切換密鑰重試...', 'ai');
+            sendMessage();
+            return;
+          }
+          throw new Error(`HTTP 錯誤！狀態：${response.status}`);
+        }
 
+        const data = await response.json();
+        let aiResponse = data.choices[0].message.content;
+        aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/g, '');
+        if (aiResponse.length > 6000) {
+          aiResponse = aiResponse.substring(0, 6000) + '...';
+        }
+        addMessage(aiResponse, 'ai');
+        conversationHistory.push({ role: 'assistant', content: aiResponse });
+        speak(aiResponse);
+      } catch (error) {
+        addMessage(`錯誤：${error.message}`, 'error');
+      }
 
-不要展示任何思考過程，即<think></think>等，不要用非中文標點符號的符號，小標題亦不要用星號括起小標題。生成內容必須為完整而沒有任何標題的段落。`;
-const response = await fetch(API_URL, {
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'Authorization': `Bearer ${API_KEYS[currentApiKeyIndex]}`
-},
-body: JSON.stringify({
-model: MODEL,
-messages: [
-{ role: 'system', content: systemPrompt },
-...conversationHistory
-],
-max_tokens: 64000
-})
-});
+      typingIndicator.style.display = 'none';
+      sendBtn.disabled = false;
+      voiceBtn.disabled = false;
+    }
 
-if (!response.ok) {
-if (response.status === 429 && currentApiKeyIndex < API_KEYS.length - 1) {
-currentApiKeyIndex++;
-addMessage('API 限制，切換密鑰重試...', 'ai');
-sendMessage();
-return;
-}
-throw new Error(`HTTP 錯誤！狀態：${response.status}`);
-}
+    sendBtn.addEventListener('click', sendMessage);
+    userInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !sendBtn.disabled) sendMessage();
+    });
 
-const data = await response.json();
-let aiResponse = data.choices[0].message.content;
-aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/g, '');
-if (aiResponse.length > 6000) {
-aiResponse = aiResponse.substring(0, 6000) + '...';
-}
-addMessage(aiResponse, 'ai');
-conversationHistory.push({ role: 'assistant', content: aiResponse });
-speak(aiResponse);
-} catch (error) {
-addMessage(`錯誤：${error.message}`, 'error');
-}
+    voiceBtn.addEventListener('click', () => {
+      if (!isRecording && recognition) {
+        startRecording();
+      }
+    });
 
-typingIndicator.style.display = 'none';
-sendBtn.disabled = false;
-voiceBtn.disabled = false;
-}
+    document.addEventListener('touchstart', (e) => {
+      if (isRecording && e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    });
 
-sendBtn.addEventListener('click', sendMessage);
-userInput.addEventListener('keypress', (e) => {
-if (e.key === 'Enter' && !sendBtn.disabled) sendMessage();
-});
+    document.addEventListener('touchmove', checkSwipe);
+    document.addEventListener('touchend', () => {
+      if (isRecording) {
+      }
+    });
 
-voiceBtn.addEventListener('click', () => {
-if (!isRecording && recognition) {
-startRecording();
-}
-});
+    document.addEventListener('DOMContentLoaded', () => {
+      const greeting = "老友記，有咩想問呢？👋";
+      addMessage(greeting, 'ai');
+      conversationHistory.push({ role: 'assistant', content: greeting });
+      speak(greeting);
 
-document.addEventListener('touchstart', (e) => {
-if (isRecording && e.touches.length > 0) {
-touchStartX = e.touches[0].clientX;
-touchStartY = e.touches[0].clientY;
-}
-});
+      if (!isSpeechRecognitionSupported()) {
+        addMessage("提示：您的瀏覽器不支援語音輸入功能，請使用最新版Chrome或Edge瀏覽器", 'error');
+      }
+    });
+  </script>
 
-document.addEventListener('touchmove', checkSwipe);
-document.addEventListener('touchend', () => {
-if (isRecording) {
-}
-});
+  <footer class="copyright-footer">
+    <p>Copyright © 2025 陳冠健、黃子謙. All rights reserved.</p>
+  </footer>
 
-// VTUBER 頭像拖拽功能
-let isDragging = false;
-let offsetX, offsetY;
-
-vtuberContainer.addEventListener('mousedown', (e) => {
-isDragging = true;
-offsetX = e.clientX - vtuberContainer.getBoundingClientRect().left;
-offsetY = e.clientY - vtuberContainer.getBoundingClientRect().top;
-vtuberContainer.style.cursor = 'grabbing';
-});
-
-document.addEventListener('mousemove', (e) => {
-if (!isDragging) return;
-
-const x = e.clientX - offsetX;
-const y = e.clientY - offsetY;
-
-// 確保頭像不會超出視窗
-const maxX = window.innerWidth - vtuberContainer.offsetWidth;
-const maxY = window.innerHeight - vtuberContainer.offsetHeight;
-
-const boundedX = Math.max(0, Math.min(x, maxX));
-const boundedY = Math.max(0, Math.min(y, maxY));
-
-vtuberContainer.style.right = 'auto';
-vtuberContainer.style.bottom = 'auto';
-vtuberContainer.style.left = `${boundedX}px`;
-vtuberContainer.style.top = `${boundedY}px`;
-});
-
-document.addEventListener('mouseup', () => {
-isDragging = false;
-vtuberContainer.style.cursor = 'grab';
-});
-
-// 觸控設備的拖動支持
-vtuberContainer.addEventListener('touchstart', (e) => {
-isDragging = true;
-offsetX = e.touches[0].clientX - vtuberContainer.getBoundingClientRect().left;
-offsetY = e.touches[0].clientY - vtuberContainer.getBoundingClientRect().top;
-});
-
-document.addEventListener('touchmove', (e) => {
-if (!isDragging) return;
-
-const x = e.touches[0].clientX - offsetX;
-const y = e.touches[0].clientY - offsetY;
-
-const maxX = window.innerWidth - vtuberContainer.offsetWidth;
-const maxY = window.innerHeight - vtuberContainer.offsetHeight;
-
-const boundedX = Math.max(0, Math.min(x, maxX));
-const boundedY = Math.max(0, Math.min(y, maxY));
-
-vtuberContainer.style.right = 'auto';
-vtuberContainer.style.bottom = 'auto';
-vtuberContainer.style.left = `${boundedX}px`;
-vtuberContainer.style.top = `${boundedY}px`;
-});
-
-document.addEventListener('touchend', () => {
-isDragging = false;
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-const greeting = "老友記，有咩想問呢？👋";
-addMessage(greeting, 'ai');
-conversationHistory.push({ role: 'assistant', content: greeting });
-speak(greeting);
-
-if (!isSpeechRecognitionSupported()) {
-addMessage("提示：您的瀏覽器不支援語音輸入功能，請使用最新版Chrome或Edge瀏覽器", 'error');
-}
-});
-</script>
-</body>
+</script></body>
 </html>
